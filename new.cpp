@@ -27,17 +27,27 @@ using namespace std;
 
 int columns = 8;
 int rows = 8;
+float A = 3.5;
+float B = 10; 
+float C = 3.5;
+float D = 0.5;
 
 int bot;
 
 vector<int> neighbour_x = {1,1,1,0,0,-1,-1,-1};
 vector<int> neighbour_y = {1,0,-1,1,-1,1,0,-1};
 
+vector<int> neighAtt_x = {1,1,0,-1,-1};
+vector<int> neighAtt_y = {1,0,1,0,1};
+
 vector<int> forward_x = {-1,0,1};
 vector<int> forward_y = {1,1,1};
 
 vector<int> attack_x = {-1,-1,0,1,1};
 vector<int> attack_y = {0,1,1,0,1};
+
+vector<int> support_x = {-1,-1,0,1,1};
+vector<int> support_y = {0,-1,-1,0,-1};
 
 vector<int> backward_x = {-2,0,2};
 vector<int> backward_y = {-2,-2,-2};
@@ -71,9 +81,11 @@ struct bmove{
 };
 
 struct miniMaxAns{
-    int utility;
+    float utility;
     bmove move;
     miniMaxAns(){
+        this->utility = 0.0;
+        this->move = bmove('M',0,0,1,1); // just to check the end case remove this ***
     }
 };
 
@@ -254,7 +266,47 @@ class board{
         return ans;
     }
 
-    bool enemy_at_pos(int x, int y)
+    bool retreatAble(position pos) // check if enemy nearby that can attack us (Slight difference from enemy Nearby)
+    {
+        bool ans = false;
+        int enemy = (this->direction+3)/2;
+        for (size_t i = 0; i < neighAtt_x.size(); i++)
+        {
+            int check_x = ((this->direction)*neighAtt_x[i]) + pos.x;
+            int check_y = ((this->direction)*neighAtt_y[i]) + pos.y ;
+            if(onBoard(check_x,check_y))
+            {
+                if (this->c_board.board_view[check_x][check_y] == enemy)
+                {
+                    ans = true;
+                    return ans;
+                }                       
+            }
+        }
+        return ans;
+    }
+
+    bool support(position pos) // check if this position has support 
+    {
+        bool ans = false;
+        int self = (this->direction*(-1)+3)/2;
+        for (size_t i = 0; i < neighAtt_x.size(); i++)
+        {
+            int check_x = ((this->direction)*support_x[i]) + pos.x;
+            int check_y = ((this->direction)*support_y[i]) + pos.y ;
+            if(onBoard(check_x,check_y))
+            {
+                if (this->c_board.board_view[check_x][check_y] == self)
+                {
+                    ans = true;
+                    return ans;
+                }                       
+            }
+        }
+        return ans;
+    }
+
+    bool self_at_pos(int x, int y)
     {
         int enemy = (this->direction + 3)/2;
         if (this->c_board.board_view[x][y] == enemy)
@@ -262,6 +314,7 @@ class board{
         else 
             return false;        
     }
+
     vector<bmove> getValidMoves(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
     {
         vector<bmove> moves;
@@ -344,7 +397,7 @@ class board{
         }
 
 
-        if (this->enemyNearby(pos))
+        if (this->retreatAble(pos))
         {
             for (int i = 0; i < backward_x.size(); i++)
             {
@@ -361,6 +414,8 @@ class board{
                 }
             }
         }
+
+
 
         // check cannon moves
         for (int i = 0; i < cannon_x.size(); i++)
@@ -458,7 +513,81 @@ class board{
         return ans;
     }
 
-    int utility(){
+    // vector<int> factors(bool black) // Factor of the terms relative to black  ........... JUST CONSIDER BLACK / WHITE HERE ... The chance logic is dealt in the Utility function accordingly
+    // {
+    //     vector<int> ans = {0,0,0,0,0,0,0,0,0}; //  Cannon shootable Empty |  Canon shootable someone | Normal Attackable Someone | Normal Attackable support | Support without any danger  
+    //     vector<position> positions;
+    //     int demand_id;
+    //     int opposite_id;
+    //     if(black) // black
+    //     {
+    //         positions = this->c_board.black_players;
+    //         demand_id = 2;
+    //         opposite_id = 1;
+    //     }
+    //     else // white 
+    //     {
+    //         positions = this->c_board.white_players;
+    //         demand_id = 1;
+    //         opposite_id = 2;
+    //     }
+    //     // Now we have the vectors and the demand_id
+
+    //     for (int i = 0; i < positions.size(); i++)
+    //     {
+    //         position pos = positions[i];
+    //         for (int i = 0; i < 4; i++) // for cannon shoots
+    //         {
+    //             int check_x_1 = pos.x + cannon_middle_x1[i];
+    //             int check_x_2 = pos.x + cannon_middle_x2[i];
+    //             int check_y_1 = pos.y + cannon_middle_y1[i];
+    //             int check_y_2 = pos.y + cannon_middle_y2[i];
+
+    //             if (onBoard(check_x_1,check_y_1) && onBoard(check_x_2,check_y_2))
+    //             {
+    //                 for (int k = 3 ; k < 5; k++)
+    //                 {
+    //                     int bomb_1_x = pos.x + k * cannon_middle_x1[i];
+    //                     int bomb_2_x = pos.x + k * cannon_middle_x2[i];
+    //                     int bomb_1_y = pos.y + k * cannon_middle_y1[i];
+    //                     int bomb_2_y = pos.y + k * cannon_middle_y2[i];
+
+    //                     int bomb_checkFront_1_x = pos.x + 2 * cannon_middle_x1[i];
+    //                     int bomb_checkFront_2_x = pos.x + 2 * cannon_middle_x2[i];
+    //                     int bomb_checkFront_1_y = pos.y + 2 * cannon_middle_y1[i];
+    //                     int bomb_checkFront_2_y = pos.y + 2 * cannon_middle_y2[i];
+
+    //                     if (this->c_board.board_view[check_x_1][check_y_1] == demand_id && this->c_board.board_view[check_x_2][check_y_2] == demand_id)
+    //                     {
+    //                         if (onBoard(bomb_1_x,bomb_1_y)  && this->c_board.board_view[bomb_checkFront_1_x][bomb_checkFront_1_y] == 0)
+    //                         {
+    //                             if(this->c_board.board_view[bomb_1_x][bomb_1_y]!=demand_id && this->c_board.board_view[bomb_1_x][bomb_1_y]!= (-1)*demand_id )  // abs because we cannot shoot our own cannon aswell
+    //                             {
+    //                                 if(this->c_board.board_view[bomb_1_x][bomb_1_y] == 0)
+    //                                     ans[0]++;
+    //                                 else
+    //                                     ans[1]++;
+    //                             }
+    //                         }
+    //                         if (onBoard(bomb_2_x,bomb_2_y)  && this->c_board.board_view[bomb_checkFront_2_x][bomb_checkFront_2_y] == 0 )
+    //                         {
+    //                             if(this->c_board.board_view[bomb_2_x][bomb_2_y] != demand_id && this->c_board.board_view[bomb_2_x][bomb_2_y] != (-1)*demand_id )
+    //                             {
+    //                                 if(this->c_board.board_view[bomb_2_x][bomb_2_y] == 0)
+    //                                     ans[0]++;
+    //                                 else
+    //                                     ans[1]++;
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     return ans;
+    // }
+
+    float utility(bool maxChance){ // MaxChance true if it is the chance of Wuji,The Bot ;)
         int myPlayers,opponent_players;
         int myTownHalls, opponent_townhalls;
         int myCannons, opponent_Cannons;
@@ -469,7 +598,7 @@ class board{
         int opponentCannonShootableSomeone; 
         int myCannonShootableSomeone;  
 
-        if (bot == 2) // white
+        if(bot == 2) // white
         {
             myCannonShootableEmpty =  this->num_Cannon_shootable(false)[0];
             opponentCannonShootableEmpty  = this->num_Cannon_shootable(true)[0];
@@ -497,12 +626,13 @@ class board{
             opponent_townhalls = this->c_board.num_white_townhalls;
         }
         
-        int A = 1 ; // soldier factor 
-        int B = 10; // townhall factor
-        int C = 5; // number 
-        int D = 2;
-        int utility = myPlayers*A+ myTownHalls*B - opponent_players*A - opponent_townhalls*B + ( myCannonShootableEmpty- opponentCannonShootableEmpty)*D + (myCannonShootableSomeone - opponentCannonShootableSomeone) * C;
-        return utility;
+        // int A = 6;// soldier factor 
+        // int B = 20; // townhall factor
+        // int C = 4; // Cannon shootable someone 
+        // int D = 2; //  Cannon shootable empty
+        float utility = (myPlayers - opponent_players)*A + (myTownHalls - opponent_townhalls)*B  + (myCannonShootableEmpty- opponentCannonShootableEmpty)*D + (myCannonShootableSomeone - opponentCannonShootableSomeone)*C;
+        
+        return utility; // Update print utility function 
     }
 
     void printUtility(){ // just copy the Utility function here for debugging
@@ -584,56 +714,59 @@ class board{
         return  this->AplhaBetaSearch();     
     }
 
-    miniMaxAns miniMaxCutoff(int depth,bool max)
-    {
-        miniMaxAns ans;
+    // miniMaxAns miniMaxCutoff(int depth,bool max)
+    // {
+    //     miniMaxAns ans;
 
-        if(this->terminal() || depth == 0)
-        {
-            ans.utility = this->utility();
-            return ans;
-        }
+    //     if(this->terminal() || depth == 0)
+    //     {
+    //         ans.utility = this->utility();
+    //         return ans;
+    //     }
         
-        vector<bmove> moves = this->getAllValidMoves();
-        if(max)
-            ans.utility = INT_MIN;
-        else
-        {
-            ans.utility = INT_MAX;
-        }
+    //     vector<bmove> moves = this->getAllValidMoves();
+    //     if(max)
+    //         // ans.utility = INT_MIN;
+    //         ans.utility = (-1)*FLT_MAX;
+    //     else
+    //     {
+    //         // ans.utility = INT_MAX;
+    //         ans.utility = FLT_MAX;
+    //     }
         
-        for (int i = 0; i < moves.size(); i++)
-        {   
-            board config = board(this->c_board,moves[i].x1,moves[i].y1,moves[i].type,moves[i].x2,moves[i].y2,(this->direction*(-1)));
-            int utility_temp = config.miniMaxCutoff(depth-1,!max).utility;
-            if(( utility_temp > ans.utility && max) || (( utility_temp < ans.utility && (!max))))
-            {
-                ans.utility = config.utility();
-                ans.move = moves[i];
-            }
-        }
-        return ans;
-    }
+    //     for (int i = 0; i < moves.size(); i++)
+    //     {   
+    //         board config = board(this->c_board,moves[i].x1,moves[i].y1,moves[i].type,moves[i].x2,moves[i].y2,(this->direction*(-1)));
+    //         int utility_temp = config.miniMaxCutoff(depth-1,!max).utility;
+    //         if(( utility_temp > ans.utility && max) || (( utility_temp < ans.utility && (!max))))
+    //         {
+    //             ans.utility = config.utility();
+    //             ans.move = moves[i];
+    //         }
+    //     }
+    //     return ans;
+    // }
 
-    miniMaxAns MinValue(int depth, int aplha, int beta)
+    miniMaxAns MinValue(int depth, float alpha, float beta)
     {
         miniMaxAns ans;
         if (this->terminal() || (depth == 0))
         {
-            ans.utility = this->utility();
+            ans.utility = this->utility(false);
             return ans;
         }
-        ans.utility = INT_MAX;
+        // ans.utility = INT_MAX;
+        ans.utility = FLT_MAX;
         vector<bmove> moves = this->getAllValidMoves();
         for (int i = 0; i < moves.size(); i++)
         {   
             board config = board(this->c_board,moves[i].x1,moves[i].y1,moves[i].type,moves[i].x2,moves[i].y2,(this->direction*(-1)));
-            int utility_temp = (config.MaxValue(depth-1,aplha,beta)).utility;
+            float utility_temp = (config.MaxValue(depth-1,alpha,beta)).utility;
             if(utility_temp < ans.utility)
             {
                 ans.utility = utility_temp;
                 ans.move = moves[i];
-                if(ans.utility <= aplha)
+                if(ans.utility <= alpha)
                 {
                     return ans;
                 }
@@ -646,20 +779,21 @@ class board{
         return ans;
     }
 
-    miniMaxAns MaxValue(int depth, int aplha, int beta)
+    miniMaxAns MaxValue(int depth, float alpha, float beta)
     {
         miniMaxAns ans;
         if (this->terminal() || (depth == 0))
         {
-            ans.utility = this->utility();
+            ans.utility = this->utility(true); // utility is a function of whoose turn it is . Isn't it natural
             return ans;
         }
-        ans.utility = INT_MIN;
+        // ans.utility = INT_MIN;
+        ans.utility = (-1) * FLT_MAX;
         vector<bmove> moves = this->getAllValidMoves();
         for (int i = 0; i < moves.size(); i++)
         {   
             board config = board(this->c_board,moves[i].x1,moves[i].y1,moves[i].type,moves[i].x2,moves[i].y2,(this->direction*(-1)));
-            int utility_temp = (config.MinValue(depth-1,aplha,beta)).utility;
+            float utility_temp = (config.MinValue(depth-1,alpha,beta)).utility;
             if(utility_temp > ans.utility)
             {
                 ans.utility = utility_temp;
@@ -669,9 +803,9 @@ class board{
                     return ans;
                 }
             }
-            if (ans.utility >= aplha)
+            if (ans.utility >= alpha)
             {
-                aplha = ans.utility;
+                alpha = ans.utility;
             }
         }
         return ans;
@@ -681,25 +815,47 @@ class board{
     {
         int players_remaning = this->c_board.white_players.size() + this->c_board.black_players.size() ;
         int depth = 4;
-        if ( players_remaning < 15 )
+        if (players_remaning < 18)
         {
             depth = 5;
         }
-        else if ( players_remaning < 7 )
+        else if (players_remaning < 14)
         {
             depth = 6;
         }
+        else if (players_remaning < 10)
+        {
+            depth = 8;
+        }
+        else if (players_remaning < 8 )
+        {
+            depth = 10;
+        }
         
-        miniMaxAns ans = MaxValue(depth,INT_MIN,INT_MAX);
+        // miniMaxAns ans = MaxValue(depth,INT_MIN,INT_MAX);
+        miniMaxAns ans = MaxValue(depth, (-1)*FLT_MAX, FLT_MAX);
         // cout << "AlphaBeta move : " <<  ans.move.x1 << " " << ans.move.y1 << " " << ans.move.type << " " << ans.move.x2 << " " << ans.move.y2 << endl;
         return ans.move;
     }
 
     bool terminal(){
-        if(this->c_board.num_black_townhalls < 3 || this-> c_board.num_white_townhalls < 3)
+        if(this->c_board.num_black_townhalls < 3 || this-> c_board.num_white_townhalls < 3 || this->c_board.white_players.size() == 0 || this->c_board.black_players.size() == 0)
             return true;
-        else 
-            return false;
+        else if(this->direction == 1){
+            if (this->c_board.white_players.size() <= 3)
+            {
+                if(this->getAllValidMoves().size()==0)
+                    return true;                /* code */
+            }
+        }
+        else if(this->direction == -1){
+            if(this->c_board.black_players.size() <= 3)
+            {
+                if(this->getAllValidMoves().size() == 0)
+                    return true;
+            }
+        }
+        return false;
     }
 
     void printAllMoves(){
@@ -714,7 +870,13 @@ class board{
 
 int main(int argc, char const *argv[])
 {
-
+    if (argc == 5) {
+        A = atof(argv[1]);
+        B = atof(argv[2]);
+        C = atof(argv[3]);
+        D = atof(argv[4]);
+    }
+    // cout << A << " " << B << " " << C << " " << D;
     string a;
     getline(cin,a);
     // cout << a << endl;
