@@ -6,7 +6,8 @@ using namespace std;
 // To DO 
 // *** Follow cannon moves on Piazza
 // winning score is important ... not just winning
-
+// judge reported moves ........ repeat three times
+// Increase depth for the just the last player or the most forward player the army 
 
 // Can we do something like we always think .. I mean even while the opponent is thinking in that case we can have a parallel thread
 // Also can we used the previous thought moves ... again to play the next move
@@ -27,10 +28,12 @@ using namespace std;
 
 int columns = 8;
 int rows = 8;
-float A = 3.5;
-float B = 10; 
-float C = 3.5;
-float D = 0.5;
+float A = 3.5;  // my players - his players
+float B = 10;  // townhall diff
+float C = 3.5; // enemy shootable diff
+float D = 0.5; // empty shootable diff
+float E = 1; // Attacking Man !!
+float F = 1; // Dedensive Man !!
 
 int bot;
 
@@ -64,6 +67,7 @@ vector<int> townhall_white_x = {0,2,4,6};
 vector<int> townhall_white_y = {0,0,0,0};
 vector<int> townhall_black_x = {1,3,5,7};
 vector<int> townhall_black_y = {7,7,7,7};
+
 struct bmove{
     char type;
     int x1;
@@ -146,7 +150,6 @@ class board{
         vector<position> moved; // just to help as variables 
         vector<position> killed;
 
-
         if (direc == 1) // white has to move
         {
             moved = this->c_board.black_players;
@@ -157,7 +160,6 @@ class board{
             moved = this->c_board.white_players;
             killed = this->c_board.black_players;
         }
-
 
         // cout << x1 << " " << y1 << " " << x2 << " " <<  y2 << " " << move_type << endl; 
 
@@ -286,6 +288,36 @@ class board{
         return ans;
     }
 
+    bool retreatAbleColour(position pos,bool black) // check if enemy nearby that can attack us (Slight difference from enemy Nearby)
+    {
+        bool ans = false;
+        int enemy;
+        int direction;
+        if(black){
+            enemy = 1;
+            direction = -1;
+        }
+        else
+        { 
+            enemy = 2;
+            direction = 1;
+        }
+        for(size_t i = 0; i < neighAtt_x.size(); i++)
+        {
+            int check_x = (direction*neighAtt_x[i]) + pos.x;
+            int check_y = (direction*neighAtt_y[i]) + pos.y ;
+            if(onBoard(check_x,check_y))
+            {
+                if (this->c_board.board_view[check_x][check_y] == enemy)
+                {
+                    ans = true;
+                    return ans;
+                }                       
+            }
+        }
+        return ans;
+    }
+
     bool support(position pos) // check if this position has support 
     {
         bool ans = false;
@@ -294,6 +326,37 @@ class board{
         {
             int check_x = ((this->direction)*support_x[i]) + pos.x;
             int check_y = ((this->direction)*support_y[i]) + pos.y ;
+            if(onBoard(check_x,check_y))
+            {
+                if (this->c_board.board_view[check_x][check_y] == self)
+                {
+                    ans = true;
+                    return ans;
+                }                       
+            }
+        }
+        return ans;
+    }
+
+    bool supportColour(position pos,bool black) // check if this position has support 
+    {
+
+        bool ans = false;
+        int self;
+        int direction;
+        if(black){
+            self = 2;
+            direction = -1;
+        }
+        else
+        { 
+            self = 1;
+            direction = 1;
+        }
+        for (size_t i = 0; i < neighAtt_x.size(); i++)
+        {
+            int check_x = (direction*support_x[i]) + pos.x;
+            int check_y = (direction*support_y[i]) + pos.y ;
             if(onBoard(check_x,check_y))
             {
                 if (this->c_board.board_view[check_x][check_y] == self)
@@ -513,79 +576,92 @@ class board{
         return ans;
     }
 
-    // vector<int> factors(bool black) // Factor of the terms relative to black  ........... JUST CONSIDER BLACK / WHITE HERE ... The chance logic is dealt in the Utility function accordingly
-    // {
-    //     vector<int> ans = {0,0,0,0,0,0,0,0,0}; //  Cannon shootable Empty |  Canon shootable someone | Normal Attackable Someone | Normal Attackable support | Support without any danger  
-    //     vector<position> positions;
-    //     int demand_id;
-    //     int opposite_id;
-    //     if(black) // black
-    //     {
-    //         positions = this->c_board.black_players;
-    //         demand_id = 2;
-    //         opposite_id = 1;
-    //     }
-    //     else // white 
-    //     {
-    //         positions = this->c_board.white_players;
-    //         demand_id = 1;
-    //         opposite_id = 2;
-    //     }
-    //     // Now we have the vectors and the demand_id
+    vector<int> factors(bool black) // Factor of the terms relative to black  ...........JUST CONSIDER BLACK / WHITE HERE ...Assume black plays  as  the chance logic is dealt in the Utility function accordingly
+    {
+        vector<int> ans = {0,0,0,0}; //  Cannon shootable Empty |  Canon shootable someone | Normal Attackable Someone | Normal Attackable support | Support without any danger  
+        vector<position> positions;
+        
+        int demand_id;
+        int opposite_id;
+        
 
-    //     for (int i = 0; i < positions.size(); i++)
-    //     {
-    //         position pos = positions[i];
-    //         for (int i = 0; i < 4; i++) // for cannon shoots
-    //         {
-    //             int check_x_1 = pos.x + cannon_middle_x1[i];
-    //             int check_x_2 = pos.x + cannon_middle_x2[i];
-    //             int check_y_1 = pos.y + cannon_middle_y1[i];
-    //             int check_y_2 = pos.y + cannon_middle_y2[i];
+        if(black) // black
+        {
+            positions = this->c_board.black_players;
+            demand_id = 2;
+            opposite_id = 1;
+        }
+        else // white 
+        {
+            positions = this->c_board.white_players;
+            demand_id = 1;
+            opposite_id = 2;
+        }
+        // Now we have the vectors and the demand_id
 
-    //             if (onBoard(check_x_1,check_y_1) && onBoard(check_x_2,check_y_2))
-    //             {
-    //                 for (int k = 3 ; k < 5; k++)
-    //                 {
-    //                     int bomb_1_x = pos.x + k * cannon_middle_x1[i];
-    //                     int bomb_2_x = pos.x + k * cannon_middle_x2[i];
-    //                     int bomb_1_y = pos.y + k * cannon_middle_y1[i];
-    //                     int bomb_2_y = pos.y + k * cannon_middle_y2[i];
+        for (int i = 0; i < positions.size(); i++)
+        {
+            position pos = positions[i];
 
-    //                     int bomb_checkFront_1_x = pos.x + 2 * cannon_middle_x1[i];
-    //                     int bomb_checkFront_2_x = pos.x + 2 * cannon_middle_x2[i];
-    //                     int bomb_checkFront_1_y = pos.y + 2 * cannon_middle_y1[i];
-    //                     int bomb_checkFront_2_y = pos.y + 2 * cannon_middle_y2[i];
+            if (retreatAbleColour(pos,black)) // means under attack ... utility based on possible attacks is highly based on whoose turn it is (Handled in the Utility function)
+            {
+                ans[2]++;
+                if(supportColour(pos,black)) // Attack and have support ... Support might not be suffecient THINK
+                {
+                    ans[3]++;
+                }
+            }
+            
+            for (int i = 0; i < 4; i++) // for cannon shoots
+            {
+                int check_x_1 = pos.x + cannon_middle_x1[i];
+                int check_x_2 = pos.x + cannon_middle_x2[i];
+                int check_y_1 = pos.y + cannon_middle_y1[i];
+                int check_y_2 = pos.y + cannon_middle_y2[i];
 
-    //                     if (this->c_board.board_view[check_x_1][check_y_1] == demand_id && this->c_board.board_view[check_x_2][check_y_2] == demand_id)
-    //                     {
-    //                         if (onBoard(bomb_1_x,bomb_1_y)  && this->c_board.board_view[bomb_checkFront_1_x][bomb_checkFront_1_y] == 0)
-    //                         {
-    //                             if(this->c_board.board_view[bomb_1_x][bomb_1_y]!=demand_id && this->c_board.board_view[bomb_1_x][bomb_1_y]!= (-1)*demand_id )  // abs because we cannot shoot our own cannon aswell
-    //                             {
-    //                                 if(this->c_board.board_view[bomb_1_x][bomb_1_y] == 0)
-    //                                     ans[0]++;
-    //                                 else
-    //                                     ans[1]++;
-    //                             }
-    //                         }
-    //                         if (onBoard(bomb_2_x,bomb_2_y)  && this->c_board.board_view[bomb_checkFront_2_x][bomb_checkFront_2_y] == 0 )
-    //                         {
-    //                             if(this->c_board.board_view[bomb_2_x][bomb_2_y] != demand_id && this->c_board.board_view[bomb_2_x][bomb_2_y] != (-1)*demand_id )
-    //                             {
-    //                                 if(this->c_board.board_view[bomb_2_x][bomb_2_y] == 0)
-    //                                     ans[0]++;
-    //                                 else
-    //                                     ans[1]++;
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return ans;
-    // }
+                if (onBoard(check_x_1,check_y_1) && onBoard(check_x_2,check_y_2))
+                {
+                    for (int k = 3 ; k < 5; k++)
+                    {
+                        int bomb_1_x = pos.x + k * cannon_middle_x1[i];
+                        int bomb_2_x = pos.x + k * cannon_middle_x2[i];
+                        int bomb_1_y = pos.y + k * cannon_middle_y1[i];
+                        int bomb_2_y = pos.y + k * cannon_middle_y2[i];
+
+                        int bomb_checkFront_1_x = pos.x + 2 * cannon_middle_x1[i];
+                        int bomb_checkFront_2_x = pos.x + 2 * cannon_middle_x2[i];
+                        int bomb_checkFront_1_y = pos.y + 2 * cannon_middle_y1[i];
+                        int bomb_checkFront_2_y = pos.y + 2 * cannon_middle_y2[i];
+
+                        if (this->c_board.board_view[check_x_1][check_y_1] == demand_id && this->c_board.board_view[check_x_2][check_y_2] == demand_id)
+                        {
+                            if (onBoard(bomb_1_x,bomb_1_y)  && this->c_board.board_view[bomb_checkFront_1_x][bomb_checkFront_1_y] == 0)
+                            {
+                                if(this->c_board.board_view[bomb_1_x][bomb_1_y]!=demand_id && this->c_board.board_view[bomb_1_x][bomb_1_y]!= (-1)*demand_id )  // abs because we cannot shoot our own cannon aswell
+                                {
+                                    if(this->c_board.board_view[bomb_1_x][bomb_1_y] == 0)
+                                        ans[0]++;
+                                    else
+                                        ans[1]++;
+                                }
+                            }
+                            if (onBoard(bomb_2_x,bomb_2_y)  && this->c_board.board_view[bomb_checkFront_2_x][bomb_checkFront_2_y] == 0 )
+                            {
+                                if(this->c_board.board_view[bomb_2_x][bomb_2_y] != demand_id && this->c_board.board_view[bomb_2_x][bomb_2_y] != (-1)*demand_id )
+                                {
+                                    if(this->c_board.board_view[bomb_2_x][bomb_2_y] == 0)
+                                        ans[0]++;
+                                    else
+                                        ans[1]++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return ans;
+    }
 
     float utility(bool maxChance){ // MaxChance true if it is the chance of Wuji,The Bot ;)
         int myPlayers,opponent_players;
@@ -598,39 +674,60 @@ class board{
         int opponentCannonShootableSomeone; 
         int myCannonShootableSomeone;  
 
-        if(bot == 2) // white
+        int whiteSoldiersWhoAreNearyEnemy; // direct normal attack
+        int blackSoldiersWhoAreNearyEnemy; // direct normal attack
+
+        int whiteSoldiersWhoAreNearyEnemyWithSupport; // direct normal attack with support 
+        int blackSoldiersWhoAreNearyEnemyWithSupport; // direct normal attack with support 
+
+        vector<int> black_factors = this->factors(true);
+        vector<int> white_factors = this->factors(false);
+
+        whiteSoldiersWhoAreNearyEnemy = white_factors[2];            
+        whiteSoldiersWhoAreNearyEnemyWithSupport = white_factors[3];           
+
+        blackSoldiersWhoAreNearyEnemy = black_factors[2];            
+        blackSoldiersWhoAreNearyEnemyWithSupport = black_factors[3];
+
+        if(bot == 2) // ATTNETION white This convention is set as a universal variable in the beginning when server sends number  and not according to the convention that is generally follwed otherwise in the file
         {
-            myCannonShootableEmpty =  this->num_Cannon_shootable(false)[0];
-            opponentCannonShootableEmpty  = this->num_Cannon_shootable(true)[0];
 
-            myCannonShootableSomeone =  this->num_Cannon_shootable(false)[1];
-            opponentCannonShootableSomeone  = this->num_Cannon_shootable(true)[1];
+            myCannonShootableEmpty =  white_factors[0];
+            opponentCannonShootableEmpty  = black_factors[0];
 
+            myCannonShootableSomeone =  white_factors[1];
+            opponentCannonShootableSomeone  = black_factors[1];
 
             myPlayers  = this->c_board.white_players.size();
             opponent_players = this->c_board.black_players.size();
             myTownHalls = this->c_board.num_white_townhalls;
             opponent_townhalls = this->c_board.num_black_townhalls;
         }
-        else if(bot == 1) // black This convention is set as a universal variable in the beginning when server sends number of 
+        
+        else if(bot == 1) // ATTNETION black This convention is set as a universal variable in the beginning when server sends number  and not according to the convention that is generally follwed otherwise in the file 
         {
-            myCannonShootableEmpty =  this->num_Cannon_shootable(true)[0];
-            opponentCannonShootableEmpty  = this->num_Cannon_shootable(false)[0];
+            myCannonShootableEmpty =  black_factors[0];
+            opponentCannonShootableEmpty  = white_factors[0];
 
-            myCannonShootableSomeone =  this->num_Cannon_shootable(true)[1];
-            opponentCannonShootableSomeone  = this->num_Cannon_shootable(false)[1];
+            myCannonShootableSomeone =  black_factors[1];
+            opponentCannonShootableSomeone  = white_factors[1];
 
             myPlayers  = this->c_board.black_players.size();
             opponent_players = this->c_board.white_players.size();
             myTownHalls = this->c_board.num_black_townhalls;
             opponent_townhalls = this->c_board.num_white_townhalls;
         }
+
+        int attack = whiteSoldiersWhoAreNearyEnemy + blackSoldiersWhoAreNearyEnemy;
+        int attackNeeded ; // 1 for yes -1 for no 
+        if((this->direction == -1 && bot == 1) || (this->direction == 1 && bot == 2)) 
+            attackNeeded = 1;
+        else
+            attackNeeded = -1;
         
-        // int A = 6;// soldier factor 
-        // int B = 20; // townhall factor
-        // int C = 4; // Cannon shootable someone 
-        // int D = 2; //  Cannon shootable empty
-        float utility = (myPlayers - opponent_players)*A + (myTownHalls - opponent_townhalls)*B  + (myCannonShootableEmpty- opponentCannonShootableEmpty)*D + (myCannonShootableSomeone - opponentCannonShootableSomeone)*C;
+        attack = attack * (-1);
+
+        float utility = (myPlayers - opponent_players)*A + (myTownHalls - opponent_townhalls)*B + (myCannonShootableSomeone - opponentCannonShootableSomeone)*C + (myCannonShootableEmpty- opponentCannonShootableEmpty)*D + attack*E;
         
         return utility; // Update print utility function 
     }
@@ -827,11 +924,10 @@ class board{
         {
             depth = 8;
         }
-        else if (players_remaning < 8 )
+        else if (players_remaning < 8)
         {
             depth = 10;
         }
-        
         // miniMaxAns ans = MaxValue(depth,INT_MIN,INT_MAX);
         miniMaxAns ans = MaxValue(depth, (-1)*FLT_MAX, FLT_MAX);
         // cout << "AlphaBeta move : " <<  ans.move.x1 << " " << ans.move.y1 << " " << ans.move.type << " " << ans.move.x2 << " " << ans.move.y2 << endl;
