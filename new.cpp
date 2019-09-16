@@ -31,8 +31,8 @@ int rows = 8;
 float A = 3.5;  // my players - his players
 float B = 10;  // townhall diff
 float C = 3.5; // enemy shootable diff
-float D = 0.5; // empty shootable diff
-float E = 1; // Attacking Man !!
+float D = 0.25; // empty shootable diff
+float E = 0; // Attacking Man !!
 float F = 1; // Dedensive Man !!
 
 int bot;
@@ -427,7 +427,6 @@ class board{
                 }
             }
         }
-        
         for (int i = 0; i < attack_x.size(); i++)
         {
             int enemy = (this->direction + 3)/2;
@@ -464,11 +463,12 @@ class board{
         {
             for (int i = 0; i < backward_x.size(); i++)
             {
+                int enemy = (this->direction + 3)/2;
                 int check_x = pos.x + backward_x[i];
                 int check_y =  pos.y + (backward_y[i] * this->direction);
                 if (onBoard(check_x,check_y))
                 {
-                    if(this->c_board.board_view[check_x][check_y]  == 0)
+                    if(this->c_board.board_view[check_x][check_y]  == 0 || this->c_board.board_view[check_x][check_y] == enemy)
                     {
                         bmove* temp;
                         temp = new bmove('M',pos.x,pos.y,check_x,check_y); 
@@ -477,8 +477,156 @@ class board{
                 }
             }
         }
+        // check cannon moves
+        for (int i = 0; i < cannon_x.size(); i++)
+        {
+            int check_x = pos.x + cannon_x[i]; // no need to check / multiply with direction as cannon can move back and forth 
+            int check_y = pos.y + cannon_y[i];
+            if (onBoard(check_x,check_y) && this->c_board.board_view[check_x][check_y] == 0)
+            {
+                int temp_x_1 = pos.x + sgn(cannon_x[i]);
+                int temp_y_1 = pos.y + sgn(cannon_y[i]);
+                int temp_x_2 = temp_x_1 + sgn(cannon_x[i]);
+                int temp_y_2 = temp_y_1 + sgn(cannon_y[i]);
+                
+                int self = (this->direction*(-1) + 3)/2;
+                if (this->c_board.board_view[temp_x_1][temp_y_1] == self & this->c_board.board_view[temp_x_2][temp_y_2] == self)
+                {
+                    bmove* temp;
+                    temp = new bmove('M',pos.x,pos.y,check_x,check_y); 
+                    moves.push_back(*temp);
+                }
+            }
+        }
+        return moves;
+    }
 
+    vector<bmove> getCannonAttackMoves(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
+    {
+        vector<bmove> moves;
 
+        for (int i = 0; i < 4; i++) // for cannon shoots
+        {
+            int check_x_1 = pos.x + cannon_middle_x1[i];
+            int check_x_2 = pos.x + cannon_middle_x2[i];
+            int check_y_1 = pos.y + cannon_middle_y1[i];
+            int check_y_2 = pos.y + cannon_middle_y2[i];
+
+            int self = (this->direction*(-1) + 3)/2;
+            if (onBoard(check_x_1,check_y_1) && onBoard(check_x_2,check_y_2))
+            {
+                for (int k = 3 ; k < 5; k++)
+                {
+                    int bomb_1_x = pos.x + k * cannon_middle_x1[i];
+                    int bomb_2_x = pos.x + k * cannon_middle_x2[i];
+                    int bomb_1_y = pos.y + k * cannon_middle_y1[i];
+                    int bomb_2_y = pos.y + k * cannon_middle_y2[i];
+                    int bomb_checkFront_1_x = pos.x + 2 * cannon_middle_x1[i];
+                    int bomb_checkFront_2_x = pos.x + 2 * cannon_middle_x2[i];
+                    int bomb_checkFront_1_y = pos.y + 2 * cannon_middle_y1[i];
+                    int bomb_checkFront_2_y = pos.y + 2 * cannon_middle_y2[i];
+                    if (this->c_board.board_view[check_x_1][check_y_1]== self && this->c_board.board_view[check_x_2][check_y_2] == self)
+                    {
+                        if (onBoard(bomb_1_x,bomb_1_y) && this->c_board.board_view[bomb_checkFront_1_x][bomb_checkFront_1_y] == 0 )
+                        {
+                            if(this->c_board.board_view[bomb_1_x][bomb_1_y]!=self && this->c_board.board_view[bomb_1_x][bomb_1_y]!= (-1)*self )  // abs because we cannot shoot our own cannon aswell
+                            {
+                                bmove* temp;
+                                temp = new bmove('B',pos.x,pos.y,bomb_1_x,bomb_1_y); 
+                                moves.push_back(*temp);
+                            }
+                        }
+                        if (onBoard(bomb_2_x,bomb_2_y) && this->c_board.board_view[bomb_checkFront_2_x][bomb_checkFront_2_y] == 0 )
+                        {
+                            if(this->c_board.board_view[bomb_2_x][bomb_2_y] != self && this->c_board.board_view[bomb_2_x][bomb_2_y] != (-1)*self )
+                            {
+                                bmove* temp;
+                                temp = new bmove('B',pos.x,pos.y,bomb_2_x,bomb_2_y); 
+                                moves.push_back(*temp);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    vector<bmove> getCannonAttackMovesWithoutEmptyShoots(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
+    {
+        vector<bmove> moves;
+
+        for (int i = 0; i < 4; i++) // for cannon shoots
+        {
+            int check_x_1 = pos.x + cannon_middle_x1[i];
+            int check_x_2 = pos.x + cannon_middle_x2[i];
+            int check_y_1 = pos.y + cannon_middle_y1[i];
+            int check_y_2 = pos.y + cannon_middle_y2[i];
+
+            int self = (this->direction*(-1) + 3)/2;
+            if (onBoard(check_x_1,check_y_1) && onBoard(check_x_2,check_y_2))
+            {
+                for (int k = 3 ; k < 5; k++)
+                {
+                    int bomb_1_x = pos.x + k * cannon_middle_x1[i];
+                    int bomb_2_x = pos.x + k * cannon_middle_x2[i];
+                    int bomb_1_y = pos.y + k * cannon_middle_y1[i];
+                    int bomb_2_y = pos.y + k * cannon_middle_y2[i];
+                    int bomb_checkFront_1_x = pos.x + 2 * cannon_middle_x1[i];
+                    int bomb_checkFront_2_x = pos.x + 2 * cannon_middle_x2[i];
+                    int bomb_checkFront_1_y = pos.y + 2 * cannon_middle_y1[i];
+                    int bomb_checkFront_2_y = pos.y + 2 * cannon_middle_y2[i];
+                    if (this->c_board.board_view[check_x_1][check_y_1]== self && this->c_board.board_view[check_x_2][check_y_2] == self)
+                    {
+                        if (onBoard(bomb_1_x,bomb_1_y) && this->c_board.board_view[bomb_checkFront_1_x][bomb_checkFront_1_y] == 0 )
+                        {
+                            if(this->c_board.board_view[bomb_1_x][bomb_1_y]!=self && this->c_board.board_view[bomb_1_x][bomb_1_y]!= (-1)*self && this->c_board.board_view[bomb_1_x][bomb_1_y]!= 0 )  // abs because we cannot shoot our own cannon aswell
+                            {
+                                bmove* temp;
+                                temp = new bmove('B',pos.x,pos.y,bomb_1_x,bomb_1_y); 
+                                moves.push_back(*temp);
+                            }
+                        }
+                        if (onBoard(bomb_2_x,bomb_2_y) && this->c_board.board_view[bomb_checkFront_2_x][bomb_checkFront_2_y] == 0 )
+                        {
+                            if(this->c_board.board_view[bomb_2_x][bomb_2_y] != self && this->c_board.board_view[bomb_2_x][bomb_2_y] != (-1)*self && this->c_board.board_view[bomb_2_x][bomb_2_y]!= 0 )
+                            {
+                                bmove* temp;
+                                temp = new bmove('B',pos.x,pos.y,bomb_2_x,bomb_2_y); 
+                                moves.push_back(*temp);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    vector<bmove> getAttackMoves(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
+    {
+        vector<bmove> moves;
+        for (int i = 0; i < attack_x.size(); i++)
+        {
+            int enemy = (this->direction + 3)/2;
+            int check_x = pos.x + attack_x[i];
+            int check_y =  pos.y + (attack_y[i] * this->direction);
+            if (onBoard(check_x,check_y))
+            {
+                if(this->c_board.board_view[check_x][check_y]  == enemy || this->c_board.board_view[check_x][check_y] == (-1)*enemy) //abs because -2 and 2 are both enemies ..  remember -2 is black townhall
+                {
+                    bmove* temp;
+                    temp = new bmove('M',pos.x,pos.y,check_x,check_y); 
+                    moves.push_back(*temp);
+                }
+            }            
+        }
+        return moves;
+    }
+
+    vector<bmove> getCannonMoveValidMoves(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
+    {
+        vector<bmove> moves;
 
         // check cannon moves
         for (int i = 0; i < cannon_x.size(); i++)
@@ -501,8 +649,53 @@ class board{
                 }
             }
         }
+        return moves;
+    }
 
 
+    vector<bmove> getForwardMoveValidMoves(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
+    {
+        vector<bmove> moves;
+        for (int i = 0; i < forward_x.size(); i++)
+        {   
+            int check_x = pos.x + forward_x[i];
+            int check_y =  pos.y + (forward_y[i] * (this->direction));
+            if (onBoard(check_x,check_y))
+            {
+                if(this->c_board.board_view[check_x][check_y] == 0)
+                {
+                    bmove* temp;
+                    temp = new bmove('M',pos.x,pos.y,check_x,check_y); 
+                    moves.push_back(*temp);
+                }
+            }
+        }
+       return moves;
+    }
+
+
+    vector<bmove> getBackwardMoveValidMoves(position pos)  // give a vector of possible moves ... Can be a priority queue here according to som heuristics I mean node ordering to make good alpha beta ..
+    {
+        vector<bmove> moves;
+        int enemy = (this->direction + 3)/2;
+
+        if (this->retreatAble(pos))
+        {
+            for (int i = 0; i < backward_x.size(); i++)
+            {
+                int check_x = pos.x + backward_x[i];
+                int check_y =  pos.y + (backward_y[i] * this->direction);
+                if (onBoard(check_x,check_y))
+                {
+                    if(this->c_board.board_view[check_x][check_y]  == 0 || this->c_board.board_view[check_x][check_y] == enemy)
+                    {
+                        bmove* temp;
+                        temp = new bmove('M',pos.x,pos.y,check_x,check_y); 
+                        moves.push_back(*temp);
+                    }   
+                }
+            }
+        }
         return moves;
     }
 
@@ -663,6 +856,28 @@ class board{
         return ans;
     }
 
+    int attackableSodiers(){
+        int num = 0;
+        vector<position> b_positions = this->c_board.black_players;
+        vector<position> w_positions = this->c_board.white_players;
+        
+        for (int i = 0; i < b_positions.size(); i++)
+        {
+            if (retreatAbleColour(b_positions[i],true)) // means under attack ... utility based on possible attacks is highly based on whoose turn it is (Handled in the Utility function)
+            {
+                num++;
+            }
+        }
+        for (int i = 0; i < w_positions.size(); i++)
+        {
+            if (retreatAbleColour(w_positions[i],false)) // means under attack ... utility based on possible attacks is highly based on whoose turn it is (Handled in the Utility function)
+            {
+                num++;
+            }
+        }
+        return num;
+    }
+
     float utility(bool maxChance){ // MaxChance true if it is the chance of Wuji,The Bot ;)
         int myPlayers,opponent_players;
         int myTownHalls, opponent_townhalls;
@@ -780,11 +995,9 @@ class board{
         cout << "Player diff and score : " << myPlayers-opponent_players << " " << (myPlayers-opponent_players)*A  << endl; 
         cout << "Town Hall diff and score : " << myTownHalls - opponent_townhalls << " " << (myTownHalls - opponent_townhalls)*B  << endl; 
         cout << "Cannon shootable me(empty and someone) , his(empty ans someone) : " << myCannonShootableEmpty << " " << opponentCannonShootableEmpty << " "  << myCannonShootableSomeone << " " << opponentCannonShootableSomeone << endl;
-
-
     }
 
-    vector<bmove> getAllValidMoves()
+    vector<bmove> getAllValidMoves(bool repeat)
     {
         vector<bmove> moves;
         int num_players;
@@ -793,22 +1006,92 @@ class board{
         else
             num_players = this->c_board.black_players.size();
 
-        for (size_t i = 0; i < num_players; i++)
+        //   for (int i = 0; i < num_players; i++)
+        // {
+        //     vector<bmove> temp;
+        //     if(direction == 1)
+        //         temp =  this->getValidMoves(this->c_board.white_players[i]);
+        //     else
+        //         temp =  this->getValidMoves(this->c_board.black_players[i]);
+        //     moves.insert(moves.end(), temp.begin(), temp.end());
+        // }
+
+        if (repeat) // no empty shoots in repeat
+        {
+            for (int i = 0; i < num_players; i++)
+            {
+                vector<bmove> temp;
+                if(direction == 1)
+                    temp =  this->getCannonAttackMovesWithoutEmptyShoots(this->c_board.white_players[i]);
+                else
+                    temp =  this->getCannonAttackMovesWithoutEmptyShoots(this->c_board.black_players[i]);
+                moves.insert(moves.end(), temp.begin(), temp.end());
+            }
+            
+        }
+        else
+        {
+            for (int i = 0; i < num_players; i++)
+            {
+                vector<bmove> temp;
+                if(direction == 1)
+                    temp =  this->getCannonAttackMoves(this->c_board.white_players[i]);
+                else
+                    temp =  this->getCannonAttackMoves(this->c_board.black_players[i]);
+                moves.insert(moves.end(), temp.begin(), temp.end());
+            }
+        }
+        
+
+
+        for (int i = 0; i < num_players; i++)
         {
             vector<bmove> temp;
             if(direction == 1)
-                temp =  this->getValidMoves(this->c_board.white_players[i]);
+                temp =  this->getAttackMoves(this->c_board.white_players[i]);
             else
-                temp =  this->getValidMoves(this->c_board.black_players[i]);
-
+                temp =  this->getAttackMoves(this->c_board.black_players[i]);
             moves.insert(moves.end(), temp.begin(), temp.end());
         }
+
+        for (int i = 0; i < num_players; i++)
+        {
+            vector<bmove> temp;
+            if(direction == 1)
+                temp =  this->getCannonMoveValidMoves(this->c_board.white_players[i]);
+            else
+                temp =  this->getCannonMoveValidMoves(this->c_board.black_players[i]);
+            moves.insert(moves.end(), temp.begin(), temp.end());
+        }
+
+        for (int i = 0; i < num_players; i++)
+        {
+            vector<bmove> temp;
+            if(direction == 1)
+                temp =  this->getForwardMoveValidMoves(this->c_board.white_players[i]);
+            else
+                temp =  this->getForwardMoveValidMoves(this->c_board.black_players[i]);
+            moves.insert(moves.end(), temp.begin(), temp.end());
+        }
+
+
+        for (int i = 0; i < num_players; i++)
+        {
+            vector<bmove> temp;
+            if(direction == 1)
+                temp =  this->getBackwardMoveValidMoves(this->c_board.white_players[i]);
+            else
+                temp =  this->getBackwardMoveValidMoves(this->c_board.black_players[i]);
+            moves.insert(moves.end(), temp.begin(), temp.end());
+        }
+
         return moves;
     }
 
-    bmove play(){ // we don't have to take tention whether the current situation is a terminal state or not !! BUT WE HAVE TO IN THE SEARCH
+
+    bmove play(bool repeat){ // we don't have to take tention whether the current situation is a terminal state or not !! BUT WE HAVE TO IN THE SEARCH
     //    return (this->miniMaxCutoff(4,true)).move;   
-        return  this->AplhaBetaSearch();     
+        return  this->AplhaBetaSearch(repeat);     
     }
 
     // miniMaxAns miniMaxCutoff(int depth,bool max)
@@ -844,21 +1127,28 @@ class board{
     //     return ans;
     // }
 
-    miniMaxAns MinValue(int depth, float alpha, float beta)
+    miniMaxAns MinValue(int depth, float alpha, float beta , int chances, bool repeat)
     {
         miniMaxAns ans;
         if (this->terminal() || (depth == 0))
         {
+            // if(!(this->terminal()) && depth==0)
+            // {
+            //     if( chances > 0 && this->criticalPosition())
+            //     {
+            //         return this->MinValue(depth + 2,alpha,beta,chances - 1); // THINK
+            //     }
+            // }
             ans.utility = this->utility(false);
             return ans;
         }
         // ans.utility = INT_MAX;
         ans.utility = FLT_MAX;
-        vector<bmove> moves = this->getAllValidMoves();
+        vector<bmove> moves = this->getAllValidMoves(repeat);
         for (int i = 0; i < moves.size(); i++)
         {   
             board config = board(this->c_board,moves[i].x1,moves[i].y1,moves[i].type,moves[i].x2,moves[i].y2,(this->direction*(-1)));
-            float utility_temp = (config.MaxValue(depth-1,alpha,beta)).utility;
+            float utility_temp = (config.MaxValue(depth-1,alpha,beta,chances,repeat)).utility;
             if(utility_temp < ans.utility)
             {
                 ans.utility = utility_temp;
@@ -876,21 +1166,60 @@ class board{
         return ans;
     }
 
-    miniMaxAns MaxValue(int depth, float alpha, float beta)
+    bool criticalPosition()
+    {
+        bool ans = false;
+        
+        // for (int i = 0; i < this->c_board.black_players.size(); i++)
+        // {
+        //     if (this->c_board.black_players[i].y <= 3)
+        //     {
+        //         ans = true;
+        //         return ans;
+        //     }
+                        
+        // }
+        
+        // for (int i = 0; i < this->c_board.white_players.size(); i++)
+        // {
+        //     if (this->c_board.white_players[i].y >= 5)
+        //     {
+        //         ans = true;
+        //         return ans;
+        //     }
+                        
+        // }
+
+        if (this->attackableSodiers() >= 5) // THINK
+        {
+            ans = true;
+        }
+
+        return ans;
+    }
+
+    miniMaxAns MaxValue(int depth, float alpha, float beta, int chances,bool repeat)
     {
         miniMaxAns ans;
         if (this->terminal() || (depth == 0))
         {
+            // if(!(this->terminal()) && depth==0)
+            // {
+            //     if( chances > 0 && this->criticalPosition())
+            //     {
+            //         return this->MaxValue(depth + 2,alpha,beta,chances - 1); // Tell me about this
+            //     }
+            // }
             ans.utility = this->utility(true); // utility is a function of whoose turn it is . Isn't it natural
             return ans;
         }
         // ans.utility = INT_MIN;
         ans.utility = (-1) * FLT_MAX;
-        vector<bmove> moves = this->getAllValidMoves();
+        vector<bmove> moves = this->getAllValidMoves(repeat);
         for (int i = 0; i < moves.size(); i++)
         {   
             board config = board(this->c_board,moves[i].x1,moves[i].y1,moves[i].type,moves[i].x2,moves[i].y2,(this->direction*(-1)));
-            float utility_temp = (config.MinValue(depth-1,alpha,beta)).utility;
+            float utility_temp = (config.MinValue(depth-1,alpha,beta,chances,repeat)).utility;
             if(utility_temp > ans.utility)
             {
                 ans.utility = utility_temp;
@@ -908,28 +1237,46 @@ class board{
         return ans;
     }
 
-    bmove AplhaBetaSearch()
+    bmove AplhaBetaSearch(bool repeat)
     {
         int players_remaning = this->c_board.white_players.size() + this->c_board.black_players.size() ;
         int depth = 4;
-        if (players_remaning < 18)
+        if (players_remaning < 21)
         {
             depth = 5;
         }
-        else if (players_remaning < 14)
+        if (players_remaning < 18)
         {
             depth = 6;
         }
-        else if (players_remaning < 10)
+        else if (players_remaning < 16)
+        {
+            depth = 7;
+        }
+        else if (players_remaning < 14)
         {
             depth = 8;
         }
-        else if (players_remaning < 8)
+        else if (players_remaning < 12)
+        {
+            depth = 9;
+        }
+        else if (players_remaning < 10)
         {
             depth = 10;
         }
+        else if(players_remaning < 6)
+        {
+            depth = 12;
+        }
+
+        if (repeat)
+        {
+            depth = depth - 1;
+        }
+        
         // miniMaxAns ans = MaxValue(depth,INT_MIN,INT_MAX);
-        miniMaxAns ans = MaxValue(depth, (-1)*FLT_MAX, FLT_MAX);
+        miniMaxAns ans = MaxValue(depth, (-1)*FLT_MAX, FLT_MAX,1,repeat);
         // cout << "AlphaBeta move : " <<  ans.move.x1 << " " << ans.move.y1 << " " << ans.move.type << " " << ans.move.x2 << " " << ans.move.y2 << endl;
         return ans.move;
     }
@@ -940,28 +1287,28 @@ class board{
         else if(this->direction == 1){
             if (this->c_board.white_players.size() <= 3)
             {
-                if(this->getAllValidMoves().size()==0)
+                if(this->getAllValidMoves(false).size()==0)
                     return true;                /* code */
             }
         }
         else if(this->direction == -1){
             if(this->c_board.black_players.size() <= 3)
             {
-                if(this->getAllValidMoves().size() == 0)
+                if(this->getAllValidMoves(false).size() == 0)
                     return true;
             }
         }
         return false;
     }
 
-    void printAllMoves(){
-        vector<bmove> moves = this->getAllValidMoves();
-        for (int i = 0; i < moves.size(); i++)
-        {
-            cout << moves[i].x1 << " " << moves[i].y1 << " " << moves[i].type << " " << moves[i].x2 << " " << moves[i].y2 << endl ;
-        }
+    // void printAllMoves(){
+    //     vector<bmove> moves = this->getAllValidMoves();
+    //     for (int i = 0; i < moves.size(); i++)
+    //     {
+    //         cout << moves[i].x1 << " " << moves[i].y1 << " " << moves[i].type << " " << moves[i].x2 << " " << moves[i].y2 << endl ;
+    //     }
         
-    }
+    // }
 };
 
 int main(int argc, char const *argv[])
@@ -1069,13 +1416,25 @@ int main(int argc, char const *argv[])
     
     // game.printAllMoves();    
 
+    string opponentMove1 = "1";
+    string opponentMove2 = "2";
+    string opponentMove3 = "3";
+    string opponentMove4 = "4";
+
+    bool repeatOpp = false;
 
     while (true){
         if (myTurn)
         {
-                       
             // cout << "Bot will move:" << endl;
-            bmove BotMove = game.play(); //  ........
+
+
+            bmove BotMove;
+            if (repeatOpp) // imporove this
+                BotMove = game.play(true); //  ........
+            else
+                BotMove = game.play(false); //  ........
+            // string move = "S " BotMove.x1 + " " + BotMove.y1 + " " + BotMove.type + " " + BotMove.x2 + " " + BotMove.y2 ;
             cout << "S " << BotMove.x1 << " " << BotMove.y1 << " " << BotMove.type << " " << BotMove.x2 << " " << BotMove.y2 << endl; 
             game = board(game.c_board,BotMove.x1,BotMove.y1,BotMove.type,BotMove.x2,BotMove.y2,game.direction*(-1));
         }
@@ -1088,6 +1447,7 @@ int main(int argc, char const *argv[])
             int x2,y2;
             string move;
             getline(cin,move);
+
             // cout << move << endl;
             player = move[0];
             x1 = (int)(move[2]) - 48;            
@@ -1100,6 +1460,15 @@ int main(int argc, char const *argv[])
             game = board(game.c_board,x1,y1,Move,x2,y2,game.direction*(-1));
             // cout << "hi";
 
+            repeatOpp == false;
+
+            if(move == opponentMove3 && move == opponentMove2 && move == opponentMove1 && move == opponentMove4|| (move == opponentMove2 && move == opponentMove4))
+                repeatOpp = true;
+            
+            opponentMove4 = opponentMove3;
+            opponentMove3 = opponentMove2;
+            opponentMove2 = opponentMove1;
+            opponentMove1 = move;
         }
         myTurn=!myTurn;
 
